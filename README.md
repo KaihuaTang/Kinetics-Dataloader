@@ -1,5 +1,5 @@
-# Kinetics-Dataloader
-A self-contained pytorch kinetics-400/kinetics-600 dataloader
+# A self-contained pytorch Kinetics Dataloader
+Still working on it
 
 # Environment
 

@@ -9,9 +9,8 @@ import torch.utils.data
 from torchvision import transforms
 
 import utils_logger as logging
+import utils_decoder as decoder
 
-
-from . import decoder as decoder
 from . import utils as utils
 from . import video_container as container
 from .random_erasing import RandomErasing
