@@ -1,2 +1,10 @@
 # Kinetics-Dataloader
-A pytorch kinetics-400/kinetics-600 dataloader
+A self-contained pytorch kinetics-400/kinetics-600 dataloader
+
+# Environment
+
+```
+conda create -n YOUR_ENV_NAME pip python=3.8
+source activate YOUR_ENV_NAME
+conda install pytorch==1.6.0 torchvision==0.7.0 -c pytorch
+```
