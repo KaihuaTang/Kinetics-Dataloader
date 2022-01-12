@@ -10,11 +10,10 @@ from torchvision import transforms
 
 import utils_logger as logging
 import utils_decoder as decoder
+import utils_general as utils
 
-from . import utils as utils
-from . import video_container as container
-from .random_erasing import RandomErasing
-from .transform import create_random_augment
+from utils_random_erasing import RandomErasing
+
 
 logger = logging.custom_logger(output_path='./')
 
@@ -204,7 +203,7 @@ class Kinetics(torch.utils.data.Dataset):
         for i_try in range(self._num_retries):
             video_container = None
             try:
-                video_container = container.get_video_container(
+                video_container = utils.get_video_container(
                     self._path_to_videos[index],
                     self.cfg.DATA_LOADER.ENABLE_MULTI_THREAD_DECODE,
                     self.cfg.DATA.DECODING_BACKEND,
@@ -321,7 +320,7 @@ class Kinetics(torch.utils.data.Dataset):
         max_scale,
         crop_size,
     ):
-        aug_transform = create_random_augment(
+        aug_transform = utils.create_random_augment(
             input_size=(frames.size(1), frames.size(2)),
             auto_augment=self.cfg.AUG.AA_TYPE,
             interpolation=self.cfg.AUG.INTERPOLATION,
