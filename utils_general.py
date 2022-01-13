@@ -7,6 +7,8 @@ import random
 import torch
 from PIL import Image
 from torchvision import transforms
+from torch.utils.data.distributed import DistributedSampler
+
 from utils_rand_augment import rand_augment_transform
 
 
@@ -34,26 +36,26 @@ def pack_pathway_output(cfg, frames):
         frame_list (list): list of tensors with the dimension of
             `channel` x `num frames` x `height` x `width`.
     """
-    if cfg.DATA.REVERSE_INPUT_CHANNEL:
+    if cfg['data']['reverse_input_channel']:
         frames = frames[[2, 1, 0], :, :, :]
-    if cfg.MODEL.ARCH in cfg.MODEL.SINGLE_PATHWAY_ARCH:
+    if cfg['model']['arch'] in cfg['model']['single_pathway_arch']:
         frame_list = [frames]
-    elif cfg.MODEL.ARCH in cfg.MODEL.MULTI_PATHWAY_ARCH:
+    elif cfg['model']['arch'] in cfg['model']['multi_pathway_arch']:
         fast_pathway = frames
         # Perform temporal sampling from the fast pathway.
         slow_pathway = torch.index_select(
             frames,
             1,
             torch.linspace(
-                0, frames.shape[1] - 1, frames.shape[1] // cfg.SLOWFAST.ALPHA
+                0, frames.shape[1] - 1, frames.shape[1] // cfg['slowfast']['alpha']
             ).long(),
         )
         frame_list = [slow_pathway, fast_pathway]
     else:
         raise NotImplementedError(
             "Model arch {} is not in {}".format(
-                cfg.MODEL.ARCH,
-                cfg.MODEL.SINGLE_PATHWAY_ARCH + cfg.MODEL.MULTI_PATHWAY_ARCH,
+                cfg['model']['arch'],
+                cfg['model']['single_pathway_arch'] + cfg['model']['multi_pathway_arch'],
             )
         )
     return frame_list
@@ -565,3 +567,21 @@ def get_video_container(path_to_vid, multi_thread_decode=False, backend="pyav"):
         return container
     else:
         raise NotImplementedError("Unknown backend {}".format(backend))
+
+
+
+def create_sampler(dataset, shuffle, cfg):
+    """
+    Create sampler for the given dataset.
+    Args:
+        dataset (torch.utils.data.Dataset): the given dataset.
+        shuffle (bool): set to ``True`` to have the data reshuffled
+            at every epoch.
+        cfg (CfgNode): configs. Details can be found in
+            slowfast/config/defaults.py
+    Returns:
+        sampler (Sampler): the created sampler.
+    """
+    sampler = DistributedSampler(dataset) if torch.cuda.device_count() > 1 else None
+
+    return sampler
