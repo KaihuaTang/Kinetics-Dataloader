@@ -1,7 +1,7 @@
 # A self-contained pytorch Kinetics Dataloader
 Still working on it
 
-This dataloader is modified from [SlowFast](https://github.com/facebookresearch/SlowFast)
+This project provides a compact self-contained kinetics dataloader based on Pytorch. The codes are modified from [SlowFast](https://github.com/facebookresearch/SlowFast).
 
 # Environment
 

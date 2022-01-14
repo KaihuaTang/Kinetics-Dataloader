@@ -25,7 +25,7 @@ class Kinetics(torch.utils.data.Dataset):
     bottom crop if the height is larger than the width.
     """
 
-    def __init__(self, cfg, mode, logger, num_retries=10):
+    def __init__(self, cfg, mode, logger, num_retries=3):
         """
         Construct the Kinetics video loader with a given csv file. The format of
         the csv file is:
@@ -45,11 +45,7 @@ class Kinetics(torch.utils.data.Dataset):
             num_retries (int): number of retries.
         """
         # Only support train, val, and test mode.
-        assert mode in [
-            "train",
-            "val",
-            "test",
-        ], "Split '{}' not supported for Kinetics".format(mode)
+        assert mode in ["train", "val", "test"], "Split '{}' not supported for Kinetics".format(mode)
         self.mode = mode
         self.cfg = cfg
         self.logger = logger
@@ -63,16 +59,13 @@ class Kinetics(torch.utils.data.Dataset):
         if self.mode in ["train", "val"]:
             self._num_clips = 1
         elif self.mode in ["test"]:
-            self._num_clips = (
-                cfg['test']['num_ensemble_views'] * cfg['test']['num_spatial_crops']
-            )
+            self._num_clips = cfg['test']['num_ensemble_views'] * cfg['test']['num_spatial_crops']
 
         self.logger.info("Constructing Kinetics {}...".format(mode))
         self._construct_loader()
+
         self.aug = False
         self.rand_erase = False
-        self.use_temporal_gradient = False
-        self.temporal_gradient_rate = 0.0
 
         if self.mode == "train" and self.cfg['aug']['enable']:
             self.aug = True
