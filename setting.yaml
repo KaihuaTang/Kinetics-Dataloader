@@ -57,7 +57,6 @@ multigrid:
   short_cycle: False          # Enable short cycles.
   short_cycle_factors: [0.5, 0.7071067811865476]   # Short cycle additional spatial dimensions relative to the default crop size.  [0.5, 0.5 ** 0.5]
   long_cycle_sampling_rate: 0 # No need to specify; Set automatically and used as global variables.
-  default_s: 0                # No need to specify; Set automatically and used as global variables.
 
 
 model:

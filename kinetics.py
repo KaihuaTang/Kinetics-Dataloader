@@ -124,16 +124,6 @@ class Kinetics(torch.utils.data.Dataset):
             max_scale = self.cfg['data']['train_jitter_scales'][1]
             crop_size = self.cfg['data']['train_crop_size']
 
-            if self.cfg['multigrid']['default_s'] > 0:
-                # Decreasing the scale is equivalent to using a larger "span"
-                # in a sampling grid.
-                min_scale = int(
-                    round(
-                        float(min_scale)
-                        * crop_size
-                        / self.cfg['multigrid']['default_s']
-                    )
-                )
         elif self.mode in ["test"]:
             temporal_sample_index = (
                 self._spatial_temporal_idx[index]
