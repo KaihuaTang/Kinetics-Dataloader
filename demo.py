@@ -5,8 +5,10 @@
 #############################
 
 import argparse
+import imp
 import yaml
 import utils_logger as logging
+from loader import construct_loader
 
 
 # ============================================================================
@@ -34,4 +36,7 @@ with open('setting.yaml') as f:
 config['data']['path_to_anno_dir'] = args.anno_path
 
 
-
+# ============================================================================
+# construct dataloader
+train_loader = construct_loader(config, 'train', logger)
+first_batch = train_loader[0]

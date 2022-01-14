@@ -24,7 +24,14 @@ data_loader:
   enable_multi_thread_decode: False  # Enable multi thread decoding.
 
 
+train:
+  dataset: 'kinetics'                # Dataset.
+  batch_size: 64                     # Total mini-batch size.
+
+
 test:
+  dataset: 'kinetics'       # Dataset
+  batch_size: 8             # Total mini-batch size
   num_ensemble_views: 10    # Number of clips to sample from a video uniformly for aggregating the prediction results.
   num_spatial_crops: 3      # Number of crops to sample from a frame spatially for aggregating the prediction results.
 
@@ -42,6 +49,7 @@ aug:
 
 multigrid:
   epoch_factor: 1.5           # Multigrid training allows us to train for more epochs with fewer iterations. The default setting in paper trains for 1.5x more epochs than baseline.
+  short_cycle: False          # Enable short cycles.
   short_cycle_factors: [0.5, 0.7071067811865476]   # Short cycle additional spatial dimensions relative to the default crop size.  [0.5, 0.5 ** 0.5]
   long_cycle_sampling_rate: 0 # No need to specify; Set automatically and used as global variables.
   default_s: 0                # No need to specify; Set automatically and used as global variables.

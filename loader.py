@@ -43,43 +43,6 @@ def multiple_samples_collate(batch, fold=False):
         return inputs, labels, video_idx, extra_data
 
 
-def detection_collate(batch):
-    """
-    Collate function for detection task. Concatanate bboxes, labels and
-    metadata from different samples in the first dimension instead of
-    stacking them to have a batch-size dimension.
-    Args:
-        batch (tuple or list): data batch to collate.
-    Returns:
-        (tuple): collated detection data batch.
-    """
-    inputs, labels, video_idx, extra_data = zip(*batch)
-    inputs, video_idx = default_collate(inputs), default_collate(video_idx)
-    labels = torch.tensor(np.concatenate(labels, axis=0)).float()
-
-    collated_extra_data = {}
-    for key in extra_data[0].keys():
-        data = [d[key] for d in extra_data]
-        if key == "boxes" or key == "ori_boxes":
-            # Append idx info to the bboxes before concatenating them.
-            bboxes = [
-                np.concatenate(
-                    [np.full((data[i].shape[0], 1), float(i)), data[i]], axis=1
-                )
-                for i in range(len(data))
-            ]
-            bboxes = np.concatenate(bboxes, axis=0)
-            collated_extra_data[key] = torch.tensor(bboxes).float()
-        elif key == "metadata":
-            collated_extra_data[key] = torch.tensor(
-                list(itertools.chain(*data))
-            ).view(-1, 2)
-        else:
-            collated_extra_data[key] = default_collate(data)
-
-    return inputs, labels, video_idx, collated_extra_data
-
-
 def construct_loader(cfg, split, logger, is_precise_bn=False):
     """
     Constructs the data loader for the given dataset.
@@ -91,18 +54,18 @@ def construct_loader(cfg, split, logger, is_precise_bn=False):
     """
     assert split in ["train", "val", "test"]
     if split in ["train"]:
-        dataset_name = cfg.TRAIN.DATASET
-        batch_size = int(cfg.TRAIN.BATCH_SIZE / max(1, cfg.NUM_GPUS))
+        dataset_name = cfg['train']['dataset']
+        batch_size = int(cfg['train']['batch_size'] / max(1, torch.cuda.device_count()))
         shuffle = True
         drop_last = True
     elif split in ["val"]:
-        dataset_name = cfg.TRAIN.DATASET
-        batch_size = int(cfg.TRAIN.BATCH_SIZE / max(1, cfg.NUM_GPUS))
+        dataset_name = cfg['train']['dataset']
+        batch_size = int(cfg['train']['batch_size'] / max(1, torch.cuda.device_count()))
         shuffle = False
         drop_last = False
     elif split in ["test"]:
-        dataset_name = cfg.TEST.DATASET
-        batch_size = int(cfg.TEST.BATCH_SIZE / max(1, cfg.NUM_GPUS))
+        dataset_name = cfg['test']['dataset']
+        batch_size = int(cfg['test']['batch_size'] / max(1, torch.cuda.device_count()))
         shuffle = False
         drop_last = False
 
@@ -113,15 +76,15 @@ def construct_loader(cfg, split, logger, is_precise_bn=False):
         loader = torch.utils.data.DataLoader(
             dataset,
             batch_size=batch_size,
-            num_workers=cfg.DATA_LOADER.NUM_WORKERS,
-            pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
+            num_workers=cfg['data_loader']['num_workers'],
+            pin_memory=cfg['data_loader']['pin_memory'],
             drop_last=drop_last,
-            collate_fn=detection_collate if cfg.DETECTION.ENABLE else None,
+            collate_fn= None,
             worker_init_fn=None,
         )
     else:
         if (
-            cfg.MULTIGRID.SHORT_CYCLE
+            cfg['multigrid']['short_cycle']
             and split in ["train"]
             and not is_precise_bn
         ):
@@ -134,17 +97,15 @@ def construct_loader(cfg, split, logger, is_precise_bn=False):
             loader = torch.utils.data.DataLoader(
                 dataset,
                 batch_sampler=batch_sampler,
-                num_workers=cfg.DATA_LOADER.NUM_WORKERS,
-                pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
+                num_workers=cfg['data_loader']['num_workers'],
+                pin_memory=cfg['data_loader']['pin_memory'],
                 worker_init_fn=None,
             )
         else:
             # Create a sampler for multi-process training
             sampler = utils.create_sampler(dataset, shuffle, cfg)
             # Create a loader
-            if cfg.DETECTION.ENABLE:
-                collate_func = detection_collate
-            elif cfg.AUG.NUM_SAMPLE > 1 and split in ["train"]:
+            if cfg['aug']['num_sample'] > 1 and split in ["train"]:
                 collate_func = partial(
                     multiple_samples_collate, fold="imagenet" in dataset_name
                 )
@@ -156,8 +117,8 @@ def construct_loader(cfg, split, logger, is_precise_bn=False):
                 batch_size=batch_size,
                 shuffle=(False if sampler else shuffle),
                 sampler=sampler,
-                num_workers=cfg.DATA_LOADER.NUM_WORKERS,
-                pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
+                num_workers=cfg['data_loader']['num_workers'],
+                pin_memory=cfg['data_loader']['pin_memory'],
                 drop_last=drop_last,
                 collate_fn=collate_func,
                 worker_init_fn=None,
