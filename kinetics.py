@@ -57,7 +57,7 @@ class Kinetics(torch.utils.data.Dataset):
         # video. For every clip, NUM_SPATIAL_CROPS is cropped spatially from
         # the frames.
         if self.mode in ["train", "val"]:
-            self._num_clips = 1
+            self._num_clips = cfg['train']['num_ensemble_views'] * cfg['train']['num_spatial_crops']
         elif self.mode in ["test"]:
             self._num_clips = cfg['test']['num_ensemble_views'] * cfg['test']['num_spatial_crops']
 
@@ -72,12 +72,12 @@ class Kinetics(torch.utils.data.Dataset):
             if self.cfg['aug']['re_prob'] > 0:
                 self.rand_erase = True
 
+
     def _construct_loader(self):
         """
         Construct the video loader.
         """
         path_to_file = os.path.join(self.cfg['data']['path_to_anno_dir'], "output_{}.csv".format(self.mode))
-
         assert os.path.isfile(path_to_file), "{} dir not found".format(path_to_file)
 
         self._path_to_videos = []
@@ -89,21 +89,16 @@ class Kinetics(torch.utils.data.Dataset):
 
                 path, label = path_label
 
+                # sample _num_clips for each video
                 for idx in range(self._num_clips):
                     self._path_to_videos.append(path)
                     self._labels.append(int(label))
                     self._spatial_temporal_idx.append(idx)
                     self._video_meta[clip_idx * self._num_clips + idx] = {}
-        assert (
-            len(self._path_to_videos) > 0
-        ), "Failed to load Kinetics split {} from {}".format(
-            self._split_idx, path_to_file
-        )
-        self.logger.info(
-            "Constructing kinetics dataloader (size: {}) from {}".format(
-                len(self._path_to_videos), path_to_file
-            )
-        )
+
+        assert (len(self._path_to_videos) > 0), "Failed to load Kinetics split {} from {}".format(self.mode, path_to_file)
+        self.logger.info("Constructing kinetics dataloader (size: {}) from {}".format(len(self._path_to_videos), path_to_file))
+
 
     def __getitem__(self, index):
         """
@@ -120,10 +115,6 @@ class Kinetics(torch.utils.data.Dataset):
                 decoded, then return the index of the video. If not, return the
                 index of the video replacement that can be decoded.
         """
-        short_cycle_idx = None
-        # When short cycle is used, input index is a tupple.
-        if isinstance(index, tuple):
-            index, short_cycle_idx = index
 
         if self.mode in ["train", "val"]:
             # -1 indicates random sampling.
@@ -132,13 +123,7 @@ class Kinetics(torch.utils.data.Dataset):
             min_scale = self.cfg['data']['train_jitter_scales'][0]
             max_scale = self.cfg['data']['train_jitter_scales'][1]
             crop_size = self.cfg['data']['train_crop_size']
-            if short_cycle_idx in [0, 1]:
-                crop_size = int(
-                    round(
-                        self.cfg['multigrid']['short_cycle_factors'][short_cycle_idx]
-                        * self.cfg['multigrid']['default_s']
-                    )
-                )
+
             if self.cfg['multigrid']['default_s'] > 0:
                 # Decreasing the scale is equivalent to using a larger "span"
                 # in a sampling grid.

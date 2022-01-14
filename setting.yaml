@@ -30,6 +30,8 @@ data_loader:
 train:
   dataset: 'kinetics'                # Dataset.
   batch_size: 64                     # Total mini-batch size.
+  num_ensemble_views: 1              # Number of clips to sample from a video uniformly for aggregating the prediction results.
+  num_spatial_crops: 1               # Number of crops to sample from a frame spatially for aggregating the prediction results.
 
 
 test:
