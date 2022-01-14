@@ -5,6 +5,8 @@
 #############################
 
 import argparse
+import torch
+import numpy as np
 import yaml
 import utils_logger as logging
 from loader import construct_loader
@@ -37,6 +39,14 @@ with open('setting.yaml') as f:
 # ============================================================================
 # upgrade config
 config['data']['path_to_anno_dir'] = args.anno_path
+
+
+# ============================================================================
+# Set up environment.
+du.init_distributed_training(config)
+# Set random seed from configs.
+np.random.seed(config['rng_seed'])
+torch.manual_seed(config['rng_seed'])
 
 
 # ============================================================================
