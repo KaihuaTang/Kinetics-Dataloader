@@ -5,7 +5,6 @@
 #############################
 
 import argparse
-import imp
 import yaml
 import utils_logger as logging
 from loader import construct_loader
@@ -28,7 +27,10 @@ logger = logging.custom_logger(output_path='./')
 # load config
 logger.info('=====> Load config from setting.yaml')
 with open('setting.yaml') as f:
-    config = yaml.load(f)
+    if float(yaml.__version__) >= 5.4:
+        config = yaml.full_load(f)
+    else:
+        config = yaml.load(f)
 
 
 # ============================================================================
