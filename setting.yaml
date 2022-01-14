@@ -1,3 +1,6 @@
+rng_seed: 1                          # Note that non-determinism may still be present due to non-deterministic operator implementations in GPU operator libraries.
+shard_id: 0                          # The index of the current machine.
+
 data:
   path_to_anno_dir: ''               # The path to the annotation directory.
   use_offset_sampling: False         # If True, perform stride length uniform temporal sampling.

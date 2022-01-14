@@ -267,16 +267,16 @@ def init_distributed_training(cfg):
     """
     Initialize variables needed for distributed training.
     """
-    if cfg.NUM_GPUS <= 1:
+    if torch.cuda.device_count() <= 1:
         return
-    num_gpus_per_machine = cfg.NUM_GPUS
+    num_gpus_per_machine = torch.cuda.device_count()
     num_machines = dist.get_world_size() // num_gpus_per_machine
     for i in range(num_machines):
         ranks_on_i = list(
             range(i * num_gpus_per_machine, (i + 1) * num_gpus_per_machine)
         )
         pg = dist.new_group(ranks_on_i)
-        if i == cfg.SHARD_ID:
+        if i == cfg['shard_id']:
             global _LOCAL_PROCESS_GROUP
             _LOCAL_PROCESS_GROUP = pg
 
