@@ -11,8 +11,6 @@ from torchvision import transforms
 import utils_decoder as decoder
 import utils_general as utils
 
-from utils_random_erasing import RandomErasing
-
 
 class Kinetics(torch.utils.data.Dataset):
     """
@@ -64,14 +62,6 @@ class Kinetics(torch.utils.data.Dataset):
         self.logger.info("Constructing Kinetics {}...".format(mode))
         self._construct_loader()
 
-        self.aug = False
-        self.rand_erase = False
-
-        if self.mode == "train" and self.cfg['aug']['enable']:
-            self.aug = True
-            if self.cfg['aug']['re_prob'] > 0:
-                self.rand_erase = True
-
 
     def _construct_loader(self):
         """
@@ -120,43 +110,36 @@ class Kinetics(torch.utils.data.Dataset):
             # -1 indicates random sampling.
             temporal_sample_index = -1
             spatial_sample_index = -1
-            min_scale = self.cfg['data']['train_jitter_scales'][0]
-            max_scale = self.cfg['data']['train_jitter_scales'][1]
+            min_scale = self.cfg['data']['train_scales'][0]
+            max_scale = self.cfg['data']['train_scales'][1]
             crop_size = self.cfg['data']['train_crop_size']
 
         elif self.mode in ["test"]:
-            temporal_sample_index = (
-                self._spatial_temporal_idx[index]
-                // self.cfg['test']['num_spatial_crops']
-            )
+            # temporal_sample_index
+            temporal_sample_index = self._spatial_temporal_idx[index] // self.cfg['test']['num_spatial_crops']
+
             # spatial_sample_index is in [0, 1, 2]. Corresponding to left,
             # center, or right if width is larger than height, and top, middle,
             # or bottom if height is larger than width.
-            spatial_sample_index = (
-                (
-                    self._spatial_temporal_idx[index]
-                    % self.cfg['test']['num_spatial_crops']
-                )
-                if self.cfg['test']['num_spatial_crops'] > 1
-                else 1
-            )
-            min_scale, max_scale, crop_size = (
-                [self.cfg['data']['test_crop_size']] * 3
-                if self.cfg['test']['num_spatial_crops'] > 1
-                else [self.cfg['data']['train_jitter_scales'][0]] * 2
-                + [self.cfg['data']['test_crop_size']]
-            )
+            if self.cfg['test']['num_spatial_crops'] > 1:
+                spatial_sample_index = self._spatial_temporal_idx[index] % self.cfg['test']['num_spatial_crops']
+            else:
+                spatial_sample_index = 1
+            
+            # frame scales
+            if self.cfg['test']['num_spatial_crops'] > 1:
+                min_scale, max_scale, crop_size = [self.cfg['data']['test_crop_size']] * 3    
+            else:
+                min_scale, max_scale, crop_size = [self.cfg['data']['train_scales'][0]] * 2 + [self.cfg['data']['test_crop_size']]
+
             # The testing is deterministic and no jitter should be performed.
             # min_scale, max_scale, and crop_size are expect to be the same.
             assert len({min_scale, max_scale}) == 1
         else:
-            raise NotImplementedError(
-                "Does not support {} mode".format(self.mode)
-            )
-        sampling_rate = utils.get_random_sampling_rate(
-            self.cfg['multigrid']['long_cycle_sampling_rate'],
-            self.cfg['data']['sampling_rate'],
-        )
+            raise NotImplementedError("Does not support {} mode".format(self.mode))
+
+        sampling_rate = self.cfg['data']['sampling_rate']
+
         # Try to decode and sample a clip from a video. If the video can not be
         # decoded, repeatly find a random video replacement that can be decoded.
         for i_try in range(self._num_retries):
@@ -164,22 +147,15 @@ class Kinetics(torch.utils.data.Dataset):
             try:
                 video_container = utils.get_video_container(
                     self._path_to_videos[index],
-                    self.cfg['data_loader']['enable_multi_thread_decode'],
-                    self.cfg['data']['decoding_backend'],
+                    backend = self.cfg['data']['decoding_backend'],
                 )
             except Exception as e:
-                self.logger.info(
-                    "Failed to load video from {} with error {}".format(
-                        self._path_to_videos[index], e
-                    )
-                )
+                self.logger.info("Failed to load video from {} with error {}".format(self._path_to_videos[index], e))
+
             # Select a random video if the current video was not able to access.
             if video_container is None:
-                self.logger.warning(
-                    "Failed to meta load video idx {} from {}; trial {}".format(
-                        index, self._path_to_videos[index], i_try
-                    )
-                )
+                self.logger.warning("Failed to meta load video idx {} from {}; trial {}".format(index, self._path_to_videos[index], i_try))
+                
                 if self.mode not in ["test"] and i_try > self._num_retries // 2:
                     # let's try another one
                     index = random.randint(0, len(self._path_to_videos) - 1)
@@ -202,149 +178,33 @@ class Kinetics(torch.utils.data.Dataset):
             # If decoding failed (wrong format, video is too short, and etc),
             # select another video.
             if frames is None:
-                self.logger.warning(
-                    "Failed to decode video idx {} from {}; trial {}".format(
-                        index, self._path_to_videos[index], i_try
-                    )
-                )
+                self.logger.warning("Failed to decode video idx {} from {}; trial {}".format(index, self._path_to_videos[index], i_try))
+
                 if self.mode not in ["test"] and i_try > self._num_retries // 2:
                     # let's try another one
                     index = random.randint(0, len(self._path_to_videos) - 1)
                 continue
 
-            if self.aug:
-                if self.cfg['aug']['num_sample'] > 1:
 
-                    frame_list = []
-                    label_list = []
-                    index_list = []
-                    for _ in range(self.cfg['aug']['num_sample']):
-                        new_frames = self._aug_frame(
-                            frames,
-                            spatial_sample_index,
-                            min_scale,
-                            max_scale,
-                            crop_size,
-                        )
-                        label = self._labels[index]
-                        new_frames = utils.pack_pathway_output(
-                            self.cfg, new_frames
-                        )
-                        frame_list.append(new_frames)
-                        label_list.append(label)
-                        index_list.append(index)
-                    return frame_list, label_list, index_list, {}
-
-                else:
-                    frames = self._aug_frame(
-                        frames,
-                        spatial_sample_index,
-                        min_scale,
-                        max_scale,
-                        crop_size,
-                    )
-
-            else:
-                frames = utils.tensor_normalize(
-                    frames, self.cfg['data']['mean'], self.cfg['data']['std']
-                )
-                # T H W C -> C T H W.
-                frames = frames.permute(3, 0, 1, 2)
-                # Perform data augmentation.
-                frames = utils.spatial_sampling(
+            frames = utils.tensor_normalize(frames, self.cfg['data']['mean'], self.cfg['data']['std'])
+            # T H W C -> C T H W.
+            frames = frames.permute(3, 0, 1, 2)
+            # Perform data augmentation.
+            frames = utils.spatial_sampling(
                     frames,
                     spatial_idx=spatial_sample_index,
                     min_scale=min_scale,
                     max_scale=max_scale,
                     crop_size=crop_size,
                     random_horizontal_flip=self.cfg['data']['random_flip'],
-                    inverse_uniform_sampling=self.cfg['data']['inv_uniform_sample'],
                 )
 
             label = self._labels[index]
-            frames = utils.pack_pathway_output(self.cfg, frames)
+            frames = [frames]
             return frames, label, index, {}
         else:
-            raise RuntimeError(
-                "Failed to fetch video after {} retries.".format(
-                    self._num_retries
-                )
-            )
+            raise RuntimeError("Failed to fetch video after {} retries.".format(self._num_retries))
 
-    def _aug_frame(
-        self,
-        frames,
-        spatial_sample_index,
-        min_scale,
-        max_scale,
-        crop_size,
-    ):
-        aug_transform = utils.create_random_augment(
-            input_size=(frames.size(1), frames.size(2)),
-            auto_augment=self.cfg['aug']['aa_type'],
-            interpolation=self.cfg['aug']['interpolation'],
-        )
-        # T H W C -> T C H W.
-        frames = frames.permute(0, 3, 1, 2)
-        list_img = self._frame_to_list_img(frames)
-        list_img = aug_transform(list_img)
-        frames = self._list_img_to_frames(list_img)
-        frames = frames.permute(0, 2, 3, 1)
-
-        frames = utils.tensor_normalize(
-            frames, self.cfg['data']['mean'], self.cfg['data']['std']
-        )
-        # T H W C -> C T H W.
-        frames = frames.permute(3, 0, 1, 2)
-        # Perform data augmentation.
-        scl, asp = (
-            self.cfg['data']['train_jitter_scales_relative'],
-            self.cfg['data']['train_jitter_aspect_relative'],
-        )
-        relative_scales = (
-            None if (self.mode not in ["train"] or len(scl) == 0) else scl
-        )
-        relative_aspect = (
-            None if (self.mode not in ["train"] or len(asp) == 0) else asp
-        )
-        frames = utils.spatial_sampling(
-            frames,
-            spatial_idx=spatial_sample_index,
-            min_scale=min_scale,
-            max_scale=max_scale,
-            crop_size=crop_size,
-            random_horizontal_flip=self.cfg['data']['random_flip'],
-            inverse_uniform_sampling=self.cfg['data']['inv_uniform_sample'],
-            aspect_ratio=relative_aspect,
-            scale=relative_scales,
-            motion_shift=self.cfg['data']['train_jitter_motion_shift']
-            if self.mode in ["train"]
-            else False,
-        )
-
-        if self.rand_erase:
-            erase_transform = RandomErasing(
-                self.cfg['aug']['re_prob'],
-                mode=self.cfg['aug']['re_mode'],
-                max_count=self.cfg['aug']['re_count'],
-                num_splits=self.cfg['aug']['re_count'],
-                device="cpu",
-            )
-            frames = frames.permute(1, 0, 2, 3)
-            frames = erase_transform(frames)
-            frames = frames.permute(1, 0, 2, 3)
-
-        return frames
-
-    def _frame_to_list_img(self, frames):
-        img_list = [
-            transforms.ToPILImage()(frames[i]) for i in range(frames.size(0))
-        ]
-        return img_list
-
-    def _list_img_to_frames(self, img_list):
-        img_list = [transforms.ToTensor()(img) for img in img_list]
-        return torch.stack(img_list)
 
     def __len__(self):
         """
@@ -352,6 +212,7 @@ class Kinetics(torch.utils.data.Dataset):
             (int): the number of videos in the dataset.
         """
         return self.num_videos
+
 
     @property
     def num_videos(self):

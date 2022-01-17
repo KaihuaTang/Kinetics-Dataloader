@@ -9,58 +9,6 @@ from PIL import Image
 from torchvision import transforms
 from torch.utils.data.distributed import DistributedSampler
 
-from utils_rand_augment import rand_augment_transform
-
-
-def get_random_sampling_rate(long_cycle_sampling_rate, sampling_rate):
-    """
-    When multigrid training uses a fewer number of frames, we randomly
-    increase the sampling rate so that some clips cover the original span.
-    """
-    if long_cycle_sampling_rate > 0:
-        assert long_cycle_sampling_rate >= sampling_rate
-        return random.randint(sampling_rate, long_cycle_sampling_rate)
-    else:
-        return sampling_rate
-
-
-
-def pack_pathway_output(cfg, frames):
-    """
-    Prepare output as a list of tensors. Each tensor corresponding to a
-    unique pathway.
-    Args:
-        frames (tensor): frames of images sampled from the video. The
-            dimension is `channel` x `num frames` x `height` x `width`.
-    Returns:
-        frame_list (list): list of tensors with the dimension of
-            `channel` x `num frames` x `height` x `width`.
-    """
-    if cfg['data']['reverse_input_channel']:
-        frames = frames[[2, 1, 0], :, :, :]
-    if cfg['model']['arch'] in cfg['model']['single_pathway_arch']:
-        frame_list = [frames]
-    elif cfg['model']['arch'] in cfg['model']['multi_pathway_arch']:
-        fast_pathway = frames
-        # Perform temporal sampling from the fast pathway.
-        slow_pathway = torch.index_select(
-            frames,
-            1,
-            torch.linspace(
-                0, frames.shape[1] - 1, frames.shape[1] // cfg['slowfast']['alpha']
-            ).long(),
-        )
-        frame_list = [slow_pathway, fast_pathway]
-    else:
-        raise NotImplementedError(
-            "Model arch {} is not in {}".format(
-                cfg['model']['arch'],
-                cfg['model']['single_pathway_arch'] + cfg['model']['multi_pathway_arch'],
-            )
-        )
-    return frame_list
-
-
 
 def tensor_normalize(tensor, mean, std):
     """
@@ -113,10 +61,9 @@ def random_short_side_scale_jitter(images, min_size, max_size, boxes=None, inver
 
     height = images.shape[2]
     width = images.shape[3]
-    if (width <= height and width == size) or (
-        height <= width and height == size
-    ):
+    if (width <= height and width == size) or (height <= width and height == size):
         return images, boxes
+        
     new_width = size
     new_height = size
     if width < height:
@@ -418,53 +365,6 @@ def uniform_crop(images, size, spatial_idx, boxes=None, scale_size=None):
     if ndim == 3:
         cropped = cropped.squeeze(0)
     return cropped, cropped_boxes
-
-
-
-def _pil_interp(method):
-    if method == "bicubic":
-        return Image.BICUBIC
-    elif method == "lanczos":
-        return Image.LANCZOS
-    elif method == "hamming":
-        return Image.HAMMING
-    else:
-        return Image.BILINEAR
-
-
-def create_random_augment(
-    input_size,
-    auto_augment=None,
-    interpolation="bilinear",
-):
-    """
-    Get video randaug transform.
-    Args:
-        input_size: The size of the input video in tuple.
-        auto_augment: Parameters for randaug. An example:
-            "rand-m7-n4-mstd0.5-inc1" (m is the magnitude and n is the number
-            of operations to apply).
-        interpolation: Interpolation method.
-    """
-    if isinstance(input_size, tuple):
-        img_size = input_size[-2:]
-    else:
-        img_size = input_size
-
-    if auto_augment:
-        assert isinstance(auto_augment, str)
-        if isinstance(img_size, tuple):
-            img_size_min = min(img_size)
-        else:
-            img_size_min = img_size
-        aa_params = {"translate_const": int(img_size_min * 0.45)}
-        if interpolation and interpolation != "random":
-            aa_params["interpolation"] = _pil_interp(interpolation)
-        if auto_augment.startswith("rand"):
-            return transforms.Compose(
-                [rand_augment_transform(auto_augment, aa_params)]
-            )
-    raise NotImplementedError
 
 
 

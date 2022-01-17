@@ -4,10 +4,7 @@ shard_id: 0                          # The index of the current machine.
 data:
   path_to_anno_dir: ''               # The path to the annotation directory.
   use_offset_sampling: False         # If True, perform stride length uniform temporal sampling.
-  train_jitter_scales: [256, 320]    # The spatial augmentation jitter scales for training.
-  train_jitter_scales_relative: []   # The relative scale range of Inception-style area based random resizing augmentation. If this is provided, DATA.TRAIN_JITTER_SCALES above is ignored.
-  train_jitter_aspect_relative: []   # The relative aspect ratio range of Inception-style area based random resizing augmentation.
-  train_jitter_motion_shift: False   # Whether to apply motion shift for augmentation.
+  train_scales: [256, 320]           # The spatial augmentation jitter scales for training.
   train_crop_size: 224               # The spatial crop size for training.
   test_crop_size: 256                # The spatial crop size for testing.
   target_fps: 30                     # Input videos may has different fps, convert it to the target video fps before frame sampling.
@@ -17,14 +14,11 @@ data:
   mean: [0.45, 0.45, 0.45]           # The mean value of the video raw pixels across the R G B channels.
   std:  [0.225, 0.225, 0.225]        # The std value of the video raw pixels across the R G B channels.
   random_flip: True                  # If True, perform random horizontal flip on the video frames during training.
-  inv_uniform_sample: False          # if True, sample uniformly in [1 / max_scale, 1 / min_scale] and take a reciprocal to get the scale. If False, take a uniform sample from [min_scale, max_scale].
-  reverse_input_channel: False       # If True, revert the default input channel (RBG <-> BGR).
   
 
 data_loader:
   num_workers: 8                     # Number of data loader workers per training process.
   pin_memory: True                   # Load data to pinned host memory.
-  enable_multi_thread_decode: False  # Enable multi thread decoding.
 
 
 train:
@@ -39,31 +33,16 @@ test:
   batch_size: 8             # Total mini-batch size
   num_ensemble_views: 10    # Number of clips to sample from a video uniformly for aggregating the prediction results.
   num_spatial_crops: 3      # Number of crops to sample from a frame spatially for aggregating the prediction results.
-
-
-aug:
-  enable: False                    # Whether to enable randaug.
-  num_sample: 1                    # Number of repeated augmentations to used during training. If this is greater than 1, then the actual batch size is TRAIN.BATCH_SIZE * AUG.NUM_SAMPLE.
-  re_prob: 0.25                    # Probability of random erasing.
-  re_mode: 'pixel'                 # Random erasing mode.
-  re_count: 1                      # Random erase count.
-  re_split: False                  # Do not random erase first (clean) augmentation split.
-  aa_type: 'rand-m9-mstd0.5-inc1'  # RandAug parameters.
-  interpolation: 'bicubic'         # Interpolation method.
   
 
 multigrid:
   epoch_factor: 1.5           # Multigrid training allows us to train for more epochs with fewer iterations. The default setting in paper trains for 1.5x more epochs than baseline.
   short_cycle: False          # Enable short cycles.
   short_cycle_factors: [0.5, 0.7071067811865476]   # Short cycle additional spatial dimensions relative to the default crop size.  [0.5, 0.5 ** 0.5]
-  long_cycle_sampling_rate: 0 # No need to specify; Set automatically and used as global variables.
-
 
 model:
-  arch: 'slowfast'                                                       # Model architecture.
-  model_name: 'slowfast'                                                 # Model name
-  single_pathway_arch: ["2d", "c2d", "i3d", "slow", "x3d", "mvit"]       # Model architectures that has one single pathway.
-  multi_pathway_arch: ['slowfast']                                       # Model architectures that has multiple pathways.
+  arch: 'default'                                                       # Model architecture.
+  model_name: 'default'                                                 # Model name
 
 slowfast:
   alpha: 8                     # Corresponds to the frame rate reduction ratio, $\alpha$ between the Slow and Fast pathways.
