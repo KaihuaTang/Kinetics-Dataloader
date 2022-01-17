@@ -1,10 +1,8 @@
 # A self-contained pytorch Kinetics Dataloader
-Still working on it
-
 This project provides a compact self-contained kinetics dataloader based on Pytorch. The codes are modified from [SlowFast](https://github.com/facebookresearch/SlowFast).
 
-# Environment
-
+# Environments
+Run the following commands to install the exvironments
 ```
 conda create -n YOUR_ENV_NAME pip python=3.8
 source activate YOUR_ENV_NAME
@@ -14,3 +12,9 @@ conda install matplotlib
 pip install pyyaml
 pip install av
 ```
+
+# Prepare Datasets
+Follow the [Dataset Preprocessing](https://github.com/KaihuaTang/Kinetics-Data-Preprocessing) to prepare the Kinetics-400/Kinetics-600 datasets.
+
+# Demo
+Run the [Demo](https://github.com/KaihuaTang/Kinetics-Dataloader/blob/main/demo.ipynb) to visualize the sampled video frames. This project keep the most compact version of dataloader by removing all the frame-level data augmentation.
