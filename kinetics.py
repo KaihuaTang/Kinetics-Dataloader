@@ -197,6 +197,8 @@ class Kinetics(torch.utils.data.Dataset):
                     max_scale=max_scale,
                     crop_size=crop_size,
                     random_horizontal_flip=self.cfg['data']['random_flip'],
+                    aspect_ratio=(3.0 / 4.0, 4.0 / 3.0), 
+                    scale=(0.8, 1.0), 
                 )
 
             label = self._labels[index]
